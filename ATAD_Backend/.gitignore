@@ -1,0 +1,132 @@
+## Visual Studio / .NET build
+.vs
+bin/
+obj/
+out/
+[Bb]uild/
+[Ll]og/
+[Tt]emp/
+.vs/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Nu urcăm fișierele generate de tool-uri temporare
+*.pdb
+*.cache
+*.dbmdl
+*.bak
+*.log
+*.svclog
+*.scc
+
+# Config local (nu trebuie urcat în GitHub)
+appsettings.Development.json
+appsettings.Local.json
+appsettings.*.json.user
+secrets.json
+*.env
+.env.*
+
+# SQLite database (fișier runtime)
+*.db
+*.sqlite
+*.sqlite3
+/data/
+Database/
+
+# Publish / build outputs
+publish/
+artifacts/
+*.Publish.xml
+*.pubxml
+*.publishproj
+
+# Test results
+TestResults/
+*.coverage
+*.coveragexml
+*.testsettings
+*.vspscc
+
+# Rider / JetBrains
+.idea/
+*.iml
+*.ipr
+*.iws
+/.fleet/
+
+# Paket / NuGet
+packages/
+*.nupkg
+*.snupkg
+*.nuspec
+.nuget/
+project.lock.json
+project.fragment.lock.json
+
+# Generated files
+*.generated.*
+*_i.c
+*_p.c
+*.meta
+*.obj
+*.dll
+*.exe
+*.appx
+*.appxsym
+*.appxupload
+*.vscode/
+
+# Docker
+Dockerfile.*
+docker-compose.*
+**/bin/
+**/obj/
+!docker-compose.yml   # îl păstrăm în repo
+
+# Node / React (dacă ai frontend inclus)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+/.pnp
+.pnp.js
+/dist
+/build
+
+# Coverage / analysis
+coverage/
+*.opendb
+*.tgz
+*.cache/
+*.tmp/
+*.pid
+
+# Logs / dumps
+*.stackdump
+*.nps
+*.psess
+*.vsp
+*.vspx
+*.vsix
+*.pidb
+*.sbr
+*.tlh
+*.tli
+
+# OS files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Icon?
+desktop.ini
+
+# Tooling
+_ReSharper*/
+*.DotSettings.user
+*.resharper
+*.orig
