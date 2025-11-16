@@ -21,3 +21,83 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# -----------------------------------
+# React / Node.js standard ignores
+# -----------------------------------
+
+# dependencies
+/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# production build
+/dist/
+build/
+
+# misc
+.DS_Store
+.env
+.env.local
+.env.development.local
+.env.production.local
+.env.test.local
+
+# log files
+*.log
+
+# editor directories and files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+*.swm
+*.user
+*.orig
+
+# OS generated files
+Thumbs.db
+Desktop.ini
+
+# coverage reports
+coverage/
+
+# local server cache
+.cache/
+.parcel-cache/
+
+# optional: if you use React Snap or static export tools
+out/
+
+# Storybook
+.storybook-out
+storybook-static/
+
+# Browserslist caching
+.browserslistrc
+
+# ESLint cache
+.eslintcache
+
+# ###################################
+# EXTRA RECOMMENDED FOR YOUR PROJECT
+# ###################################
+
+# Do not upload frontend build artifacts if backend Go serves static files
+frontend-build/
+
+# Ignore lockfiles if you don’t want repo-specific installs (choose one)
+/package-lock.json
+# or
+# yarn.lock
+# or
+# pnpm-lock.yaml
+
+# Prevent uploading macOS metadata (if working on Mac at any point)
+.AppleDouble
+.LSOverride
