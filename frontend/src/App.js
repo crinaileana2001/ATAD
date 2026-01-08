@@ -1,23 +1,23 @@
-import React, { useState } from 'react';
-import './App.css';
+import React, { useState } from "react";
+import "./App.css";
 
 function App() {
-  const [url, setUrl] = useState('');
-  const [customCode, setCustomCode] = useState('');
+  const [url, setUrl] = useState("");
+  const [customCode, setCustomCode] = useState("");
   const [wantQR, setWantQR] = useState(true);
-  const [expiresAt, setExpiresAt] = useState('');
+  const [expiresAt, setExpiresAt] = useState("");
   const [result, setResult] = useState(null);
-  const [statsCode, setStatsCode] = useState('');
+  const [statsCode, setStatsCode] = useState("");
   const [stats, setStats] = useState(null);
-  const [errorShorten, setErrorShorten] = useState('');
-  const [errorStats, setErrorStats] = useState('');
+  const [errorShorten, setErrorShorten] = useState("");
+  const [errorStats, setErrorStats] = useState("");
 
   // ----------------------------
   // HANDLE SHORTEN
   // ----------------------------
   const handleShorten = async (e) => {
     e.preventDefault();
-    setErrorShorten('');
+    setErrorShorten("");
     setResult(null);
 
     try {
@@ -28,15 +28,15 @@ function App() {
         expires_at: expiresAt ? new Date(expiresAt).toISOString() : undefined,
       };
 
-      const res = await fetch('/api/shorten', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/api/shorten", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
 
       if (!res.ok) {
         const text = await res.text();
-        throw new Error(text || 'Failed to shorten URL');
+        throw new Error(text || "Failed to shorten URL");
       }
 
       const data = await res.json();
@@ -52,11 +52,13 @@ function App() {
   // ----------------------------
   const handleStats = async (e) => {
     e.preventDefault();
-    setErrorStats('');
+    setErrorStats("");
     setStats(null);
 
     try {
-      const res = await fetch(`/api/urls/${encodeURIComponent(statsCode)}/stats`);
+      const res = await fetch(
+        `/api/urls/${encodeURIComponent(statsCode)}/stats`
+      );
       if (!res.ok) {
         throw new Error(`Stats not found (${res.status})`);
       }
@@ -117,7 +119,7 @@ function App() {
         <div className="card">
           <h2>Result</h2>
           <p>
-            <strong>Short URL:</strong>{' '}
+            <strong>Short URL:</strong>{" "}
             <a href={result.short_url} target="_blank" rel="noreferrer">
               {result.short_url}
             </a>
@@ -129,11 +131,7 @@ function App() {
           {result.qr_base64 && (
             <>
               <h3>QR Code</h3>
-              <img
-                src={`data:image/png;base64,${result.qr_base64}`}
-                alt="QR"
-                className="qr"
-              />
+              <img src={result.qr_base64} alt="QR" className="qr" />
             </>
           )}
         </div>
@@ -159,13 +157,14 @@ function App() {
         <div className="card">
           <h2>Stats for {statsCode}</h2>
           <p>
-            <strong>Original URL:</strong>{' '}
+            <strong>Original URL:</strong>{" "}
             <a href={stats.original} target="_blank" rel="noreferrer">
               {stats.original}
             </a>
           </p>
           <p>
-            <strong>Total clicks:</strong> {stats.clicks}</p>
+            <strong>Total clicks:</strong> {stats.clicks}
+          </p>
         </div>
       )}
     </div>

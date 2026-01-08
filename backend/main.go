@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	qrcode "github.com/skip2/go-qrcode"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -64,7 +66,7 @@ type ShortenRequest struct {
 type ShortenResponse struct {
 	ShortURL string `json:"short_url"`
 	Code     string `json:"code"`
-	// QRBase64 string `json:"qr_base64,omitempty"` // later
+	QRBase64 string `json:"qr_base64,omitempty"` // PNG base64
 }
 
 type StatsResponse struct {
@@ -178,10 +180,22 @@ func handleShorten(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, ShortenResponse{
-		ShortURL: baseURL + "/" + u.Code,
-		Code:     u.Code,
-	}, http.StatusCreated)
+	resp := ShortenResponse{
+    ShortURL: baseURL + "/" + u.Code,
+    Code:     u.Code,
+}
+
+if req.WantQR {
+    qr, err := makeQRBase64(resp.ShortURL, 256)
+    if err != nil {
+        http.Error(w, "could not generate qr", http.StatusInternalServerError)
+        return
+    }
+    resp.QRBase64 = qr
+}
+
+writeJSON(w, resp, http.StatusCreated)
+
 }
 
 func handleRedirect(w http.ResponseWriter, r *http.Request) {
@@ -332,4 +346,14 @@ func truncate(s string, max int) string {
 
 func isUniqueConstraint(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed")
+}
+
+func makeQRBase64(text string, size int) (string, error) {
+    png, err := qrcode.Encode(text, qrcode.Medium, size)
+    if err != nil {
+        return "", err
+    }
+    // Return as data URL so frontend can display directly in <img src="...">
+    b64 := base64.StdEncoding.EncodeToString(png)
+    return "data:image/png;base64," + b64, nil
 }
