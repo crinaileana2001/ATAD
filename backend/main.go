@@ -15,21 +15,32 @@ import (
 	"strings"
 	"time"
 
+	"context"
+	"sync"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	qrcode "github.com/skip2/go-qrcode"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+	"os"
 )
 
 const (
-	baseURL     = "http://localhost:8080"
 	hashSalt    = "change-me-in-env-later"
 	codeMinLen  = 6
 	codeMaxLen  = 8
 	defaultCode = 7
 )
+
+var baseURL = os.Getenv("BASE_URL")
+
+func init() {
+	if baseURL == "" {
+		baseURL = "http://localhost:8080"
+	}
+}
 
 var db *gorm.DB
 
@@ -51,7 +62,7 @@ type ClickEvent struct {
 	IPHash   string `gorm:"size:64;index;not null"`
 	Referrer string `gorm:"size:512"`
 	UserAgent string `gorm:"size:512"`
-	// GeoCountry / GeoCity will be added later
+	GeoCountry string `gorm:"size:2;index"` 
 }
 
 // -------------------- DTOs --------------------
@@ -74,6 +85,7 @@ type StatsResponse struct {
 	Clicks         int64      `json:"clicks"`
 	UniqueVisitors int64      `json:"unique_visitors"`
 	ExpiresAt      *time.Time `json:"expires_at,omitempty"`
+	Countries      map[string]int64   `json:"countries,omitempty"` 
 }
 
 // -------------------- MAIN --------------------
@@ -219,6 +231,8 @@ func handleRedirect(w http.ResponseWriter, r *http.Request) {
 	// log click event async
 	ip := getClientIP(r)
 	ipHash := hashIP(ip)
+	country := lookupCountryISO2(ip)
+
 
 	ref := r.Referer()
 	ua := r.UserAgent()
@@ -229,6 +243,8 @@ func handleRedirect(w http.ResponseWriter, r *http.Request) {
 		IPHash:     ipHash,
 		Referrer:   truncate(ref, 512),
 		UserAgent:  truncate(ua, 512),
+		GeoCountry: country,
+
 	}
 
 	_ = db.Clauses(clause.OnConflict{DoNothing: true}).Create(&evt).Error
@@ -243,31 +259,56 @@ func handleStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 1. Get URL by code
 	var u URL
 	if err := db.Where("code = ?", code).First(&u).Error; err != nil {
 		http.NotFound(w, r)
 		return
 	}
 
+	// 2. Total clicks
 	var clicks int64
-	_ = db.Model(&ClickEvent{}).Where("url_id = ?", u.ID).Count(&clicks).Error
+	_ = db.Model(&ClickEvent{}).
+		Where("url_id = ?", u.ID).
+		Count(&clicks).Error
 
+	// 3. Unique visitors (distinct IP hash)
 	var unique int64
-	// distinct ip_hash
 	_ = db.Model(&ClickEvent{}).
 		Where("url_id = ?", u.ID).
 		Distinct("ip_hash").
 		Count(&unique).Error
 
+	// 4. Clicks by country (geo analytics)
+	type countryRow struct {
+		GeoCountry string
+		Count      int64
+	}
+
+	var rows []countryRow
+	_ = db.Model(&ClickEvent{}).
+		Select("geo_country, COUNT(*) as count").
+		Where("url_id = ? AND geo_country IS NOT NULL AND geo_country != ''", u.ID).
+		Group("geo_country").
+		Scan(&rows).Error
+
+	countries := make(map[string]int64)
+	for _, r := range rows {
+		countries[r.GeoCountry] = r.Count
+	}
+
+	// 5. Build response
 	resp := StatsResponse{
 		Original:       u.Original,
 		Clicks:         clicks,
 		UniqueVisitors: unique,
 		ExpiresAt:      u.ExpiresAt,
+		Countries:      countries, // NEW
 	}
 
 	writeJSON(w, resp, http.StatusOK)
 }
+
 
 // -------------------- HELPERS --------------------
 
@@ -325,6 +366,17 @@ func isValidCode(code string) bool {
 }
 
 func getClientIP(r *http.Request) string {
+	if xf := r.Header.Get("X-Forwarded-For"); xf != "" {
+		parts := strings.Split(xf, ",")
+		ip := strings.TrimSpace(parts[0])
+		if ip != "" {
+			return ip
+		}
+	}
+	if xr := strings.TrimSpace(r.Header.Get("X-Real-IP")); xr != "" {
+		return xr
+	}
+
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
 		return r.RemoteAddr
@@ -356,4 +408,94 @@ func makeQRBase64(text string, size int) (string, error) {
     // Return as data URL so frontend can display directly in <img src="...">
     b64 := base64.StdEncoding.EncodeToString(png)
     return "data:image/png;base64," + b64, nil
+}
+
+// -------------------- GEO (COUNTRY) --------------------
+
+type geoCacheItem struct {
+	country string
+	expires time.Time
+}
+
+var (
+	geoMu    sync.Mutex
+	geoCache = map[string]geoCacheItem{}
+)
+
+func isPrivateIP(ip string) bool {
+	parsed := net.ParseIP(ip)
+	if parsed == nil {
+		return true
+	}
+	// loopback
+	if parsed.IsLoopback() {
+		return true
+	}
+	// IPv4 private ranges
+	if v4 := parsed.To4(); v4 != nil {
+		switch {
+		case v4[0] == 10:
+			return true
+		case v4[0] == 172 && v4[1] >= 16 && v4[1] <= 31:
+			return true
+		case v4[0] == 192 && v4[1] == 168:
+			return true
+		case v4[0] == 169 && v4[1] == 254: // link-local
+			return true
+		}
+	}
+	return false
+}
+
+
+// calls ipapi.co: https://ipapi.co/<IP>/json/  :contentReference[oaicite:2]{index=2}
+func lookupCountryISO2(ip string) string {
+	if ip == "" || isPrivateIP(ip) {
+		return "" // local/private -> unknown (expected in dev)
+	}
+
+	// cache (TTL 24h)
+	now := time.Now()
+	geoMu.Lock()
+	if item, ok := geoCache[ip]; ok && now.Before(item.expires) {
+		geoMu.Unlock()
+		return item.country
+	}
+	geoMu.Unlock()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 800*time.Millisecond)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://ipapi.co/"+ip+"/json/", nil)
+	if err != nil {
+		return ""
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return ""
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return ""
+	}
+
+	var out struct {
+		Country string `json:"country"` // ipapi returns ISO2 here (e.g., "US", "RO")
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return ""
+	}
+
+	country := strings.ToUpper(strings.TrimSpace(out.Country))
+	if len(country) != 2 {
+		country = ""
+	}
+
+	geoMu.Lock()
+	geoCache[ip] = geoCacheItem{country: country, expires: now.Add(24 * time.Hour)}
+	geoMu.Unlock()
+
+	return country
 }

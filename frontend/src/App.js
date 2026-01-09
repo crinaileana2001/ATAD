@@ -165,6 +165,25 @@ function App() {
           <p>
             <strong>Total clicks:</strong> {stats.clicks}
           </p>
+
+          <p>
+            <strong>Unique visitors:</strong> {stats.unique_visitors}
+          </p>
+          {/* -------- GEO LOCATION -------- */}
+          <h3>Clicks by country</h3>
+
+          {!stats.countries || Object.keys(stats.countries).length === 0 ? (
+            <p>No geographic data available yet.</p>
+          ) : (
+            <ul>
+              {Object.entries(stats.countries).map(([country, count]) => (
+                <li key={country}>
+                  🌍 <strong>{country}</strong>: {count} click
+                  {count !== 1 ? "s" : ""}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
     </div>
