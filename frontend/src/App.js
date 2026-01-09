@@ -11,6 +11,8 @@ function App() {
   const [stats, setStats] = useState(null);
   const [errorShorten, setErrorShorten] = useState("");
   const [errorStats, setErrorStats] = useState("");
+  const [allLinks, setAllLinks] = useState([]);
+  const [errorLinks, setErrorLinks] = useState("");
 
   // ----------------------------
   // HANDLE SHORTEN
@@ -41,6 +43,7 @@ function App() {
 
       const data = await res.json();
       setResult(data);
+      loadLinks();
       setStatsCode(data.code);
     } catch (err) {
       setErrorShorten(err.message);
@@ -64,11 +67,23 @@ function App() {
       }
       const data = await res.json();
       setStats(data);
+      loadLinks();
     } catch (err) {
       setErrorStats(err.message);
     }
   };
-
+  // LOAD LINKS //
+  const loadLinks = async () => {
+    setErrorLinks("");
+    try {
+      const res = await fetch("/api/urls");
+      if (!res.ok) throw new Error(`Failed to load links (${res.status})`);
+      const data = await res.json();
+      setAllLinks(data);
+    } catch (err) {
+      setErrorLinks(err.message);
+    }
+  };
   return (
     <div className="container">
       <h1>URL Shortener</h1>
@@ -140,6 +155,53 @@ function App() {
       {/* ------------------- STATS ----------------------- */}
       <form onSubmit={handleStats} className="card">
         <h2>Statistics</h2>
+        <div className="card">
+          <h2>All links</h2>
+
+          <button type="button" onClick={loadLinks}>
+            Refresh list
+          </button>
+          {errorLinks && <p className="error">{errorLinks}</p>}
+
+          {allLinks.length === 0 ? (
+            <p>No links yet.</p>
+          ) : (
+            <table style={{ width: "100%", marginTop: 12 }}>
+              <thead>
+                <tr>
+                  <th>Code</th>
+                  <th>Original</th>
+                  <th>Clicks</th>
+                  <th>Unique</th>
+                  <th>Expires</th>
+                </tr>
+              </thead>
+              <tbody>
+                {allLinks.map((l) => (
+                  <tr key={l.code}>
+                    <td>
+                      <a href={l.short_url} target="_blank" rel="noreferrer">
+                        {l.code}
+                      </a>
+                    </td>
+                    <td style={{ maxWidth: 320, wordBreak: "break-all" }}>
+                      <a href={l.original} target="_blank" rel="noreferrer">
+                        {l.original}
+                      </a>
+                    </td>
+                    <td>{l.clicks}</td>
+                    <td>{l.unique_visitors}</td>
+                    <td>
+                      {l.expires_at
+                        ? new Date(l.expires_at).toLocaleString()
+                        : "-"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
 
         <label>Short code</label>
         <input

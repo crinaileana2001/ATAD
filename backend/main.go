@@ -88,6 +88,17 @@ type StatsResponse struct {
 	Countries      map[string]int64   `json:"countries,omitempty"` 
 }
 
+type URLListItem struct {
+	Code           string     `json:"code"`
+	ShortURL       string     `json:"short_url"`
+	Original       string     `json:"original"`
+	CreatedAt      time.Time  `json:"created_at"`
+	ExpiresAt      *time.Time `json:"expires_at,omitempty"`
+	Clicks         int64      `json:"clicks"`
+	UniqueVisitors int64      `json:"unique_visitors"`
+}
+
+
 // -------------------- MAIN --------------------
 
 func main() {
@@ -119,13 +130,15 @@ log.Println("DB file:", cwd+`\\shorty.db`)
 	})
 
 	r.Route("/api", func(api chi.Router) {
-	api.Use(RateLimitMiddleware(rl)) 
 
-	api.Post("/shorten", handleShorten)
-	api.Get("/urls/{code}/stats", handleStats)
+    // 🔒 rate limit DOAR pe creare de link
+    api.With(RateLimitMiddleware(rl)).Post("/shorten", handleShorten)
 
-	
+    // 📊 fără rate limit (read-only)
+    api.Get("/urls", handleListURLs)
+    api.Get("/urls/{code}/stats", handleStats)
 })
+
 
 // redirect-ul rămâne nelimitat
 r.Get("/{code}", handleRedirect)
@@ -329,6 +342,52 @@ func handleStats(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, resp, http.StatusOK)
+}
+
+func handleListURLs(w http.ResponseWriter, r *http.Request) {
+	type row struct {
+		Code           string
+		Original       string
+		CreatedAt      time.Time
+		ExpiresAt      *time.Time
+		Clicks         int64
+		UniqueVisitors int64
+	}
+
+	var rows []row
+	err := db.Table("urls").
+		Select(`
+			urls.code,
+			urls.original,
+			urls.created_at,
+			urls.expires_at,
+			COUNT(click_events.id) AS clicks,
+			COUNT(DISTINCT click_events.ip_hash) AS unique_visitors
+		`).
+		Joins("LEFT JOIN click_events ON click_events.url_id = urls.id").
+		Group("urls.id").
+		Order("urls.created_at DESC").
+		Scan(&rows).Error
+
+	if err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+
+	out := make([]URLListItem, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, URLListItem{
+			Code:           r.Code,
+			ShortURL:       baseURL + "/" + r.Code,
+			Original:       r.Original,
+			CreatedAt:      r.CreatedAt,
+			ExpiresAt:      r.ExpiresAt,
+			Clicks:         r.Clicks,
+			UniqueVisitors: r.UniqueVisitors,
+		})
+	}
+
+	writeJSON(w, out, http.StatusOK)
 }
 
 
