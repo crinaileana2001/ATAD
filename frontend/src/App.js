@@ -13,6 +13,7 @@ function App() {
   const [errorStats, setErrorStats] = useState("");
   const [allLinks, setAllLinks] = useState([]);
   const [errorLinks, setErrorLinks] = useState("");
+  const [linksLoadedOnce, setLinksLoadedOnce] = useState(false);
 
   // ----------------------------
   // HANDLE SHORTEN
@@ -53,25 +54,27 @@ function App() {
   // ----------------------------
   // HANDLE STATS
   // ----------------------------
+
   const handleStats = async (e) => {
     e.preventDefault();
+    await loadStats(statsCode);
+  };
+
+  const loadStats = async (code) => {
     setErrorStats("");
     setStats(null);
+    setStatsCode(code);
 
     try {
-      const res = await fetch(
-        `/api/urls/${encodeURIComponent(statsCode)}/stats`
-      );
-      if (!res.ok) {
-        throw new Error(`Stats not found (${res.status})`);
-      }
+      const res = await fetch(`/api/urls/${encodeURIComponent(code)}/stats`);
+      if (!res.ok) throw new Error(`Stats not found (${res.status})`);
       const data = await res.json();
       setStats(data);
-      loadLinks();
     } catch (err) {
       setErrorStats(err.message);
     }
   };
+
   // LOAD LINKS //
   const loadLinks = async () => {
     setErrorLinks("");
@@ -80,10 +83,13 @@ function App() {
       if (!res.ok) throw new Error(`Failed to load links (${res.status})`);
       const data = await res.json();
       setAllLinks(data);
+      setLinksLoadedOnce(true);
     } catch (err) {
       setErrorLinks(err.message);
     }
   };
+  const DISPLAY_BASE_URL = "";
+
   return (
     <div className="container">
       <h1>URL Shortener</h1>
@@ -136,11 +142,15 @@ function App() {
           <p>
             <strong>Short URL:</strong>{" "}
             <a href={result.short_url} target="_blank" rel="noreferrer">
-              {result.short_url}
+              {DISPLAY_BASE_URL}/{result.code}
             </a>
           </p>
+
           <p>
-            <strong>Code:</strong> <code>{result.code}</code>
+            <strong>Access link (dev tunnel):</strong>{" "}
+            <a href={result.short_url} target="_blank" rel="noreferrer">
+              Open link
+            </a>
           </p>
 
           {result.qr_base64 && (
@@ -158,9 +168,12 @@ function App() {
         <div className="card">
           <h2>All links</h2>
 
-          <button type="button" onClick={loadLinks}>
-            Refresh list
-          </button>
+          {linksLoadedOnce && (
+            <button type="button" onClick={loadLinks}>
+              Refresh list
+            </button>
+          )}
+
           {errorLinks && <p className="error">{errorLinks}</p>}
 
           {allLinks.length === 0 ? (
@@ -178,7 +191,11 @@ function App() {
               </thead>
               <tbody>
                 {allLinks.map((l) => (
-                  <tr key={l.code}>
+                  <tr
+                    key={l.code}
+                    onClick={() => loadStats(l.code)}
+                    style={{ cursor: "pointer" }}
+                  >
                     <td>
                       <a href={l.short_url} target="_blank" rel="noreferrer">
                         {l.code}
