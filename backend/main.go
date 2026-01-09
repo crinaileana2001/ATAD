@@ -18,13 +18,13 @@ import (
 	"context"
 	"sync"
 
+	"os"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	qrcode "github.com/skip2/go-qrcode"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
-	"os"
 )
 
 const (
@@ -92,6 +92,10 @@ type StatsResponse struct {
 
 func main() {
 	var err error
+	cwd, _ := os.Getwd()
+log.Println("CWD:", cwd)
+log.Println("DB file:", cwd+`\\shorty.db`)
+
 	db, err = gorm.Open(sqlite.Open("shorty.db"), &gorm.Config{})
 	if err != nil {
 		log.Fatal("failed to open db:", err)
@@ -103,15 +107,29 @@ func main() {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+	
+	rl := NewRateLimiter(10, 30*time.Minute)
+    stop := make(chan struct{})
+    go rl.cleanupLoop(stop)
+
 
 	// to not see "404" anymore
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Go URL shortener is running ✅"))
 	})
 
-	r.Post("/api/shorten", handleShorten)
-	r.Get("/api/urls/{code}/stats", handleStats)
-	r.Get("/{code}", handleRedirect)
+	r.Route("/api", func(api chi.Router) {
+	api.Use(RateLimitMiddleware(rl)) 
+
+	api.Post("/shorten", handleShorten)
+	api.Get("/urls/{code}/stats", handleStats)
+
+	
+})
+
+// redirect-ul rămâne nelimitat
+r.Get("/{code}", handleRedirect)
+
 
 	log.Println("Go backend running on :8080")
 	log.Fatal(http.ListenAndServe(":8080", r))
@@ -247,7 +265,11 @@ func handleRedirect(w http.ResponseWriter, r *http.Request) {
 
 	}
 
-	_ = db.Clauses(clause.OnConflict{DoNothing: true}).Create(&evt).Error
+	if err := db.Create(&evt).Error; err != nil {
+	log.Printf("CLICK INSERT FAILED: %v", err)
+} else {
+	log.Printf("CLICK SAVED: url_id=%d ip=%s country=%s", evt.URLID, ip, country)
+}
 
 	http.Redirect(w, r, u.Original, http.StatusFound)
 }
@@ -449,9 +471,10 @@ func isPrivateIP(ip string) bool {
 
 
 // calls ipapi.co: https://ipapi.co/<IP>/json/  :contentReference[oaicite:2]{index=2}
+
 func lookupCountryISO2(ip string) string {
 	if ip == "" || isPrivateIP(ip) {
-		return "" // local/private -> unknown (expected in dev)
+		return ""
 	}
 
 	// cache (TTL 24h)
@@ -463,10 +486,10 @@ func lookupCountryISO2(ip string) string {
 	}
 	geoMu.Unlock()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 800*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://ipapi.co/"+ip+"/json/", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://ipwho.is/"+ip, nil)
 	if err != nil {
 		return ""
 	}
@@ -482,13 +505,17 @@ func lookupCountryISO2(ip string) string {
 	}
 
 	var out struct {
-		Country string `json:"country"` // ipapi returns ISO2 here (e.g., "US", "RO")
+		Success     bool   `json:"success"`
+		CountryCode string `json:"country_code"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
 		return ""
 	}
+	if !out.Success {
+		return ""
+	}
 
-	country := strings.ToUpper(strings.TrimSpace(out.Country))
+	country := strings.ToUpper(strings.TrimSpace(out.CountryCode))
 	if len(country) != 2 {
 		country = ""
 	}
@@ -498,4 +525,116 @@ func lookupCountryISO2(ip string) string {
 	geoMu.Unlock()
 
 	return country
+}
+
+
+
+// -------------------- RATE LIMITING --------------------
+
+type tokenBucket struct {
+	tokens     float64
+	lastRefill time.Time
+}
+
+type RateLimiter struct {
+	mu         sync.Mutex
+	buckets    map[string]*tokenBucket
+	capacity   float64       // max tokens
+	refillRate float64       // tokens per second
+	ttl        time.Duration // cleanup idle buckets
+}
+
+func NewRateLimiter(maxPerMinute int, ttl time.Duration) *RateLimiter {
+	return &RateLimiter{
+		buckets:    make(map[string]*tokenBucket),
+		capacity:   float64(maxPerMinute),
+		refillRate: float64(maxPerMinute) / 60.0, // per second
+		ttl:        ttl,
+	}
+}
+
+func (rl *RateLimiter) allow(ip string) (allowed bool, retryAfterSec int) {
+	now := time.Now()
+
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	b, ok := rl.buckets[ip]
+	if !ok {
+		rl.buckets[ip] = &tokenBucket{
+			tokens:     rl.capacity - 1, // consume 1 token immediately
+			lastRefill: now,
+		}
+		return true, 0
+	}
+
+	// refill tokens
+	elapsed := now.Sub(b.lastRefill).Seconds()
+	if elapsed > 0 {
+		b.tokens = minFloat(rl.capacity, b.tokens+elapsed*rl.refillRate)
+		b.lastRefill = now
+	}
+
+	if b.tokens >= 1 {
+		b.tokens -= 1
+		return true, 0
+	}
+
+	// compute retry-after (seconds until next token)
+	need := 1 - b.tokens
+	sec := int((need / rl.refillRate) + 0.999) // ceil
+	if sec < 1 {
+		sec = 1
+	}
+	return false, sec
+}
+
+func (rl *RateLimiter) cleanupLoop(stop <-chan struct{}) {
+	t := time.NewTicker(5 * time.Minute)
+	defer t.Stop()
+
+	for {
+		select {
+		case <-t.C:
+			rl.cleanup()
+		case <-stop:
+			return
+		}
+	}
+}
+
+func (rl *RateLimiter) cleanup() {
+	now := time.Now()
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	for ip, b := range rl.buckets {
+		if now.Sub(b.lastRefill) > rl.ttl {
+			delete(rl.buckets, ip)
+		}
+	}
+}
+
+func RateLimitMiddleware(rl *RateLimiter) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ip := getClientIP(r)
+
+			allowed, retryAfter := rl.allow(ip)
+			if !allowed {
+				w.Header().Set("Retry-After", fmt.Sprintf("%d", retryAfter))
+				http.Error(w, "rate limit exceeded (max 10 requests/minute)", http.StatusTooManyRequests)
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+func minFloat(a, b float64) float64 {
+	if a < b {
+		return a
+	}
+	return b
 }
