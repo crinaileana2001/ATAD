@@ -1,4 +1,4 @@
-module urlshortener
+module shorty
 
 go 1.25.4
 
