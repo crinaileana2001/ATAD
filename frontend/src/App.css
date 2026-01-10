@@ -1,32 +1,79 @@
+/* =========================================
+   THEME TOKENS
+   ========================================= */
 :root {
   --bg: #0f0f14;
   --card: #171724;
   --card2: #1c1c2b;
+
   --text: #f4f4f6;
   --muted: #b9b9c7;
+
   --border: rgba(255, 255, 255, 0.08);
-  --purple: #5b21b6;       /* violet inchis */
-  --purple2: #7c3aed;      /* violet mai bright */
+
+  --purple: #5b21b6; /* dark purple */
+  --purple2: #7c3aed; /* brighter purple */
+
   --danger: #ef4444;
+
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  --radius: 14px;
 }
 
-* { box-sizing: border-box; }
+/* =========================================
+   BASE / RESET
+   ========================================= */
+* {
+  box-sizing: border-box;
+}
 
 body {
   margin: 0;
-  background: radial-gradient(1200px 700px at 20% 0%, rgba(124, 58, 237, 0.20), transparent 60%),
-              radial-gradient(900px 600px at 90% 30%, rgba(91, 33, 182, 0.18), transparent 60%),
-              var(--bg);
+  background: radial-gradient(
+      1200px 700px at 20% 0%,
+      rgba(124, 58, 237, 0.2),
+      transparent 60%
+    ),
+    radial-gradient(
+      900px 600px at 90% 30%,
+      rgba(91, 33, 182, 0.18),
+      transparent 60%
+    ),
+    var(--bg);
   color: var(--text);
-  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial,
+    "Apple Color Emoji", "Segoe UI Emoji";
 }
 
+/* =========================================
+   LAYOUT
+   ========================================= */
 .page {
   max-width: 1100px;
   margin: 0 auto;
   padding: 22px 16px 32px;
 }
 
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+
+@media (min-width: 980px) {
+  .grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.stack {
+  display: grid;
+  gap: 14px;
+}
+
+/* =========================================
+   TOPBAR / HEADER
+   ========================================= */
 .topbar {
   display: flex;
   align-items: flex-start;
@@ -56,24 +103,47 @@ body {
   white-space: nowrap;
 }
 
-.grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 14px;
+/* =========================================
+   TYPOGRAPHY / HELPERS
+   ========================================= */
+.muted {
+  color: var(--muted);
 }
 
-@media (min-width: 980px) {
-  .grid { grid-template-columns: 1fr 1fr; }
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
 }
 
-.stack { display: grid; gap: 14px; }
+.label {
+  min-width: 90px;
+  color: var(--muted);
+  font-weight: 600;
+}
 
+.hint {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.link {
+  color: #e9d5ff;
+  text-decoration: underline;
+}
+
+.mutedLink {
+  color: #d6d6e6;
+}
+
+/* =========================================
+   CARD (PRIMITIVE)
+   ========================================= */
 .card {
   background: linear-gradient(180deg, var(--card), var(--card2));
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius);
   padding: 16px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+  box-shadow: var(--shadow);
 }
 
 .cardHeader {
@@ -89,11 +159,13 @@ body {
   font-size: 18px;
 }
 
-.muted { color: var(--muted); }
-.link { color: #e9d5ff; text-decoration: underline; }
-.mutedLink { color: #d6d6e6; }
-
-.form { display: grid; gap: 12px; }
+/* =========================================
+   FORMS / INPUTS
+   ========================================= */
+.form {
+  display: grid;
+  gap: 12px;
+}
 
 .field label {
   display: block;
@@ -102,12 +174,15 @@ body {
   font-size: 13px;
 }
 
-input[type="url"], input[type="text"], input[type="datetime-local"], input {
+input[type="url"],
+input[type="text"],
+input[type="datetime-local"],
+input {
   width: 100%;
   padding: 11px 12px;
   border-radius: 10px;
   border: 1px solid var(--border);
-  background: rgba(255,255,255,0.04);
+  background: rgba(255, 255, 255, 0.04);
   color: var(--text);
   outline: none;
 }
@@ -123,9 +198,36 @@ input:focus {
 }
 
 @media (min-width: 720px) {
-  .row2 { grid-template-columns: 1fr 1fr; }
+  .row2 {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
+/* =========================================
+   CHECKBOX (QR TOGGLE)
+   ========================================= */
+.qrRow {
+  margin-top: 8px;
+}
+
+.qrLabel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+/* modern checkbox */
+.qrLabel input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--purple2);
+  cursor: pointer;
+}
+
+/* (legacy) kept for compatibility if used elsewhere */
 .checkboxRow {
   display: flex;
   align-items: center;
@@ -134,6 +236,9 @@ input:focus {
   user-select: none;
 }
 
+/* =========================================
+   BUTTONS / ACTIONS
+   ========================================= */
 .actions {
   display: flex;
   gap: 10px;
@@ -152,7 +257,7 @@ input:focus {
 
 .btn.primary {
   background: linear-gradient(180deg, var(--purple2), var(--purple));
-  border-color: rgba(124,58,237,0.35);
+  border-color: rgba(124, 58, 237, 0.35);
 }
 
 .btn.secondary {
@@ -162,18 +267,23 @@ input:focus {
 }
 
 .btn.ghost {
-  background: rgba(255,255,255,0.05);
+  background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--border);
   color: var(--text);
 }
 
-.btn:hover { filter: brightness(1.05); }
+.btn:hover {
+  filter: brightness(1.05);
+}
 
+/* =========================================
+   ALERTS
+   ========================================= */
 .alert {
   padding: 10px 12px;
   border-radius: 10px;
   border: 1px solid var(--border);
-  background: rgba(255,255,255,0.05);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .alert.error {
@@ -182,11 +292,14 @@ input:focus {
   color: #fecaca;
 }
 
+/* =========================================
+   RESULT
+   ========================================= */
 .resultBox {
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 12px;
-  background: rgba(255,255,255,0.03);
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .resultRow {
@@ -197,23 +310,29 @@ input:focus {
   margin-bottom: 10px;
 }
 
-.label {
-  min-width: 90px;
-  color: var(--muted);
-  font-weight: 600;
+/* =========================================
+   QR
+   ========================================= */
+.qrWrap {
+  margin-top: 14px;
 }
 
-.hint {
-  color: var(--muted);
-  font-size: 12px;
+.qr {
+  width: 220px;
+  max-width: 100%;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: white;
+  padding: 10px;
 }
 
-.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+/* =========================================
+   TABLES / LIST
+   ========================================= */
+.tableWrap {
+  overflow: auto;
+}
 
-.qrWrap { margin-top: 14px; }
-.qr { width: 220px; max-width: 100%; border-radius: 10px; border: 1px solid var(--border); background: white; padding: 10px; }
-
-.tableWrap { overflow: auto; }
 .table {
   width: 100%;
   border-collapse: collapse;
@@ -221,7 +340,8 @@ input:focus {
   font-size: 14px;
 }
 
-.table th, .table td {
+.table th,
+.table td {
   padding: 10px 10px;
   border-bottom: 1px solid var(--border);
   vertical-align: top;
@@ -249,17 +369,29 @@ input:focus {
   background: rgba(124, 58, 237, 0.12) !important;
 }
 
-.num { text-align: right; width: 70px; }
-.truncate { max-width: 380px; word-break: break-all; }
+.num {
+  text-align: right;
+  width: 70px;
+}
+
+.truncate {
+  max-width: 380px;
+  word-break: break-all;
+}
 
 .empty {
   padding: 12px;
-  border: 1px dashed rgba(255,255,255,0.15);
+  border: 1px dashed rgba(255, 255, 255, 0.15);
   border-radius: 12px;
-  background: rgba(255,255,255,0.03);
+  background: rgba(255, 255, 255, 0.03);
 }
 
-.statsBox { margin-top: 10px; }
+/* =========================================
+   STATS / ANALYTICS
+   ========================================= */
+.statsBox {
+  margin-top: 10px;
+}
 
 .statGrid {
   display: grid;
@@ -272,11 +404,19 @@ input:focus {
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 12px;
-  background: rgba(255,255,255,0.03);
+  background: rgba(255, 255, 255, 0.03);
 }
 
-.statLabel { color: var(--muted); font-size: 12px; }
-.statValue { font-size: 22px; font-weight: 800; margin-top: 4px; }
+.statLabel {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.statValue {
+  font-size: 22px;
+  font-weight: 800;
+  margin-top: 4px;
+}
 
 .statsRow {
   display: flex;
@@ -301,7 +441,7 @@ input:focus {
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 10px 12px;
-  background: rgba(255,255,255,0.03);
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .pill {
@@ -314,28 +454,10 @@ input:focus {
   font-size: 12px;
 }
 
+/* =========================================
+   FOOTER
+   ========================================= */
 .footer {
   margin-top: 16px;
   text-align: center;
-}
-
-.qrRow {
-  margin-top: 8px;
-}
-
-.qrLabel {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--muted);
-  font-size: 14px;
-  cursor: pointer;
-}
-
-/* checkbox modern */
-.qrLabel input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  accent-color: var(--purple2);
-  cursor: pointer;
 }
