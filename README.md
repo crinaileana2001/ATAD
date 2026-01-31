@@ -5,15 +5,15 @@ High-Level Diagram
 
 # URL Shortener with Analytics
 
-Shorty is a small full-stack URL shortener (Bitly-style) built with **Go + React + SQLite**.
-It turns a long URL into a short code (6–8 chars) and then tracks _real_ clicks so I can display analytics in a simple dashboard (total clicks, unique visitors, and clicks by country).
+Shorty is a small full-stack URL shortener  built with **Go + React + SQLite**.
+It turns a long URL into a short code (6–8 chars) and then tracks _real_ clicks so I can display analytics in a dashboard (total clicks, unique visitors, and clicks by country).
 
 ---
 
 ## What the user can do from the UI
 
 - Paste a long URL and get a short link
-- Optionally choose your own short code (custom slug)
+- Optionally choose his own short code (custom slug)
 - Optionally set an expiration date (expired links return **410 Gone**)
 - Optionally generate a QR code (server-side, PNG returned as base64)
 - View a list with all created links (+ basic stats)
@@ -217,7 +217,7 @@ If `want_qr` is true, the backend generates a QR code for the short link and ret
 
 So the frontend can display it directly in an `<img src="...">` without extra libraries.
 
-Scanning the QR should hit the same redirect endpoint, so it is tracked like a normal click
+Scanning the QR hits the same redirect endpoint, so it is tracked like a normal click
 (as long as the scan opens the URL in a browser).
 
 ---
@@ -236,7 +236,7 @@ Why token bucket:
 
 - allows small bursts (more user-friendly)
 - avoids the “minute boundary” issue of fixed-window counters
-- lightweight for a single-instance academic project (no Redis needed)
+- lightweight (no Redis needed)
 
 Important:
 The redirect endpoint `GET /{code}` is **NOT** rate limited, because the whole point is that many people can open a shared link without getting blocked.
